@@ -1,3 +1,6 @@
+  [Stanley Sayson]
+  * Added the Bozorgnia and Campbell (2016) GMPE for V/Hassani
+  
   [Michele Simionato]
   * Replaced IMT classes with factory functions
   * Changed the `minimum_distance` from a parameter of the GMPE to a
