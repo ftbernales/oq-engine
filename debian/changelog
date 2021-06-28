@@ -1,5 +1,5 @@
   [Stanley Sayson]
-  * Added the Bozorgnia and Campbell (2016) GMPE for V/Hassani
+  * Added the Bozorgnia and Campbell (2016) GMPE for V/H
   
   [Michele Simionato]
   * Replaced IMT classes with factory functions
