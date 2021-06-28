@@ -136,7 +136,6 @@ class BozorgniaCampbell2016VH(GMPE):
         for stddev_type in stddev_types:
             assert stddev_type in self.DEFINED_FOR_STANDARD_DEVIATION_TYPES
             if stddev_type == const.StdDev.TOTAL:      
-                phi_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt, stddev_types)     
                 stddevs.append(np.sqrt((tau ** 2.) + (phi ** 2.)) +
                                np.zeros(num_sites))
             elif stddev_type == const.StdDev.INTRA_EVENT:
