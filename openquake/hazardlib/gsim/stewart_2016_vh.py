@@ -27,11 +27,13 @@ Module exports :class:`StewartEtAl2016VH`,
 
 import numpy as np
 
-from openquake.hazardlib.gsim.base import GMPE, registry
-from openquake.hazardlib.gsim.bozorgnia_campbell_2016_vh import \
-                                BozorgniaCampbell2016VH as BC15b
+from openquake.hazardlib.gsim.base import GMPE
 from openquake.hazardlib import const
 from openquake.hazardlib.imt import PGA, PGV, SA
+from openquake.hazardlib.gsim.bozorgnia_campbell_2016_vh import \
+                                BozorgniaCampbell2016VH as BC15b
+import openquake.hazardlib.gsim.stewart_2016 as SBSA
+import openquake.hazardlib.gsim.boore_2014 as BSSA
 
 
 class StewartEtAl2016VH(GMPE):
@@ -52,8 +54,8 @@ class StewartEtAl2016VH(GMPE):
     Equations for Predicting Vertical-Component PGA, PGV, and 5%-Damped PSA
     from Shallow Crustal Earthquakes. *Earthquake Spectra*, *32*(2), 1005-1031.
     """
-    VGMPE = registry['StewartEtAl2016']()
-    HGMPE = registry['BooreEtAl2014']()
+    VGMPE = SBSA.StewartEtAl2016()
+    HGMPE = BSSA.BooreEtAl2014()
 
     #: Supported tectonic region type is active shallow crust; see title.
     DEFINED_FOR_TECTONIC_REGION_TYPE = const.TRT.ACTIVE_SHALLOW_CRUST
@@ -164,16 +166,16 @@ class StewartEtAl2016RegCHNVH(StewartEtAl2016VH):
     This class implements the Stewart et al. (2016) V/H model considering the
     correction to the path scaling term for High Q regions (e.g. China)
     """
-    VGMPE = registry['StewartEtAl2016'](region='CHN')
-    HGMPE = registry['BooreEtAl2014HighQ']()
+    VGMPE = SBSA.StewartEtAl2016(region='CHN')
+    HGMPE = BSSA.BooreEtAl2014HighQ()
 
 class StewartEtAl2016RegJPNVH(StewartEtAl2016VH):
     """
     This class implements the Stewart et al. (2016) V/H model considering the
     correction to the path scaling term for Low Q regions (e.g. Japan)
     """
-    VGMPE = registry['StewartEtAl2016'](region='JPN')
-    HGMPE = registry['BooreEtAl2014LowQ']()
+    VGMPE = SBSA.StewartEtAl2016(region='JPN')
+    HGMPE = BSSA.BooreEtAl2014LowQ()
 
 
 class StewartEtAl2016NoSOFVH(StewartEtAl2016VH):
@@ -182,8 +184,8 @@ class StewartEtAl2016NoSOFVH(StewartEtAl2016VH):
     style-of-faulting is unspecified. In this case the GMPE is no longer
     dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016'](sof=False)
-    HGMPE = registry['BooreEtAl2014NoSOF']()
+    VGMPE = SBSA.StewartEtAl2016(sof=False)
+    HGMPE = BSSA.BooreEtAl2014NoSOF()
 
 
 class StewartEtAl2016RegCHNNoSOFVH(StewartEtAl2016RegCHNVH):
@@ -193,8 +195,8 @@ class StewartEtAl2016RegCHNNoSOFVH(StewartEtAl2016RegCHNVH):
     unspecified. In this case the GMPE is no longer
     dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016'](region='CHN', sof=False)
-    HGMPE = registry['BooreEtAl2014HighQNoSOF']()
+    VGMPE = SBSA.StewartEtAl2016(region='CHN', sof=False)
+    HGMPE = BSSA.BooreEtAl2014HighQNoSOF()
 
 
 class StewartEtAl2016RegJPNNoSOFVH(StewartEtAl2016RegJPNVH):
@@ -203,5 +205,5 @@ class StewartEtAl2016RegJPNNoSOFVH(StewartEtAl2016RegJPNVH):
     datasets, (e.g. Japan) for the case in which the style-of-faulting is
     unspecified. In this case the GMPE is no longer dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016'](region='JPN', sof=False)
-    HGMPE = registry['BooreEtAl2014LowQNoSOF']()
+    VGMPE = SBSA.StewartEtAl2016(region='JPN', sof=False)
+    HGMPE = BSSA.BooreEtAl2014LowQNoSOF()
