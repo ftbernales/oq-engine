@@ -1,5 +1,7 @@
   [Stanley Sayson]
-  * Added the Bozorgnia and Campbell (2016) GMPE for V/Hassani
+  * Added the Stewart et al. (2016) GMPE for V/H
+  * Added the Bozorgnia and Campbell (2016) GMPE for V/H
+  * Corrected Campbell and Bozorgnia (2014) GMPE
   
   [Michele Simionato]
   * Fixed a subtle bug: in presence of a nontrivial taxonomy mapping, loss

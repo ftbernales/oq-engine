@@ -125,18 +125,21 @@ class BozorgniaCampbell2016VH(GMPE):
         since the site response- and IMT-correlation functions are neglected.
         """
         num_sites = len(sites.vs30)
-        tau_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt, [const.StdDev.INTER_EVENT])[1]
-        tau_h = self.HGMPE.get_mean_and_stddevs(sites, rup, dists, imt, [const.StdDev.INTER_EVENT])[1]
-        phi_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt, [const.StdDev.INTRA_EVENT])[1]
-        phi_h = self.HGMPE.get_mean_and_stddevs(sites, rup, dists, imt, [const.StdDev.INTRA_EVENT])[1]
+        tau_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt,
+                                                [const.StdDev.INTER_EVENT])[1]
+        tau_h = self.HGMPE.get_mean_and_stddevs(sites, rup, dists, imt,
+                                                [const.StdDev.INTER_EVENT])[1]
+        phi_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt,
+                                                [const.StdDev.INTRA_EVENT])[1]
+        phi_h = self.HGMPE.get_mean_and_stddevs(sites, rup, dists, imt,
+                                                [const.StdDev.INTRA_EVENT])[1]
         tau = self._get_tau_vh(C, rup.mag, tau_v, tau_h)
         phi = self._get_phi_vh(C, rup.mag, phi_v, phi_h)
-        
+
         stddevs = []
         for stddev_type in stddev_types:
             assert stddev_type in self.DEFINED_FOR_STANDARD_DEVIATION_TYPES
-            if stddev_type == const.StdDev.TOTAL:      
-                phi_v = self.VGMPE.get_mean_and_stddevs(sites, rup, dists, imt, stddev_types)     
+            if stddev_type == const.StdDev.TOTAL:
                 stddevs.append(np.sqrt((tau ** 2.) + (phi ** 2.)) +
                                np.zeros(num_sites))
             elif stddev_type == const.StdDev.INTRA_EVENT:
@@ -251,7 +254,8 @@ class BozorgniaCampbell2016AveQJapanSiteVH(BozorgniaCampbell2016VH):
     HGMPE = registry['CampbellBozorgnia2014JapanSite']()
 
 
-class BozorgniaCampbell2016HighQJapanSiteVH(BozorgniaCampbell2016AveQJapanSiteVH):
+class BozorgniaCampbell2016HighQJapanSiteVH(
+        BozorgniaCampbell2016AveQJapanSiteVH):
     """
     Implements the GMPE by Bozorgnia & Campbell (2016) vertical-to-horizontal
     ratio for ground motions from the PEER NGA-West2 Project
@@ -266,7 +270,8 @@ class BozorgniaCampbell2016HighQJapanSiteVH(BozorgniaCampbell2016AveQJapanSiteVH
     HGMPE = registry['CampbellBozorgnia2014HighQJapanSite']()
 
 
-class BozorgniaCampbell2016LowQJapanSiteVH(BozorgniaCampbell2016AveQJapanSiteVH):
+class BozorgniaCampbell2016LowQJapanSiteVH(
+    BozorgniaCampbell2016AveQJapanSiteVH):
     """
     Implements the GMPE by Bozorgnia & Campbell (2016) vertical-to-horizontal
     ratio for ground motions from the PEER NGA-West2 Project

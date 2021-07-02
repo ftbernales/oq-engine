@@ -54,6 +54,7 @@ class StewartEtAl2016VH(GMPE):
     """
     VGMPE = registry['StewartEtAl2016']()
     HGMPE = registry['BooreEtAl2014']()
+
     #: Supported tectonic region type is active shallow crust; see title.
     DEFINED_FOR_TECTONIC_REGION_TYPE = const.TRT.ACTIVE_SHALLOW_CRUST
 
@@ -163,7 +164,7 @@ class StewartEtAl2016RegCHNVH(StewartEtAl2016VH):
     This class implements the Stewart et al. (2016) V/H model considering the
     correction to the path scaling term for High Q regions (e.g. China)
     """
-    VGMPE = registry['StewartEtAl2016RegCHN']()
+    VGMPE = registry['StewartEtAl2016'](region='CHN')
     HGMPE = registry['BooreEtAl2014HighQ']()
 
 class StewartEtAl2016RegJPNVH(StewartEtAl2016VH):
@@ -171,7 +172,7 @@ class StewartEtAl2016RegJPNVH(StewartEtAl2016VH):
     This class implements the Stewart et al. (2016) V/H model considering the
     correction to the path scaling term for Low Q regions (e.g. Japan)
     """
-    VGMPE = registry['StewartEtAl2016RegJPN']()
+    VGMPE = registry['StewartEtAl2016'](region='JPN')
     HGMPE = registry['BooreEtAl2014LowQ']()
 
 
@@ -181,7 +182,7 @@ class StewartEtAl2016NoSOFVH(StewartEtAl2016VH):
     style-of-faulting is unspecified. In this case the GMPE is no longer
     dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016NoSOF']()
+    VGMPE = registry['StewartEtAl2016'](sof=False)
     HGMPE = registry['BooreEtAl2014NoSOF']()
 
 
@@ -192,7 +193,7 @@ class StewartEtAl2016RegCHNNoSOFVH(StewartEtAl2016RegCHNVH):
     unspecified. In this case the GMPE is no longer
     dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016RegCHNNoSOF']()
+    VGMPE = registry['StewartEtAl2016'](region='CHN', sof=False)
     HGMPE = registry['BooreEtAl2014HighQNoSOF']()
 
 
@@ -202,5 +203,5 @@ class StewartEtAl2016RegJPNNoSOFVH(StewartEtAl2016RegJPNVH):
     datasets, (e.g. Japan) for the case in which the style-of-faulting is
     unspecified. In this case the GMPE is no longer dependent on rake.
     """
-    VGMPE = registry['StewartEtAl2016RegJPNNoSOF']()
+    VGMPE = registry['StewartEtAl2016'](region='JPN', sof=False)
     HGMPE = registry['BooreEtAl2014LowQNoSOF']()
