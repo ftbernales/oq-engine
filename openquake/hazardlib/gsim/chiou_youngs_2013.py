@@ -17,15 +17,15 @@
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
 
 """
-Module exports :class:`ChiouYoungs2014`.
+Module exports :class:`ChiouYoungs2013`.
 """
 import numpy as np
 import math
 
 from openquake.hazardlib.gsim.base import GMPE, CoeffsTable
-from openquake.hazardlib.gsim.chiou_youngs_2014 import ChiouYoungs2014 as CY14
+from openquake.hazardlib.gsim import chiou_youngs_2014 as CY14
 from openquake.hazardlib import const
-from openquake.hazardlib.imt import PGA, PGV, SA
+from openquake.hazardlib.imt import SA
 
 
 class ChiouYoungs2013(GMPE):
@@ -101,18 +101,18 @@ class ChiouYoungs2013(GMPE):
         # and stddev calculations.
         ln_y_ref = self._get_ln_y_ref(rup, dists, C)
 
-        mean = self._get_mean(sites, C, ln_y_ref)
+        mean = self._get_mean(sites, rup, C, ln_y_ref)
         stddevs = self._get_stddevs(sites, rup, C, stddev_types, ln_y_ref)
 
         return mean, stddevs
 
-    def _get_mean(self, sites, C, ln_y_ref):
+    def _get_mean(self, sites, rup, C, ln_y_ref):
         """
         Add site effects to an intensity.
 
         Implements eq. 13b.
         """
-        reg = self._get_regional_terms(C)
+        reg = self._get_regional_terms(rup, C)
         # we do not support estimating of basin depth and instead
         # rely on it being available (since we require it).
         # centered_z1pt0
@@ -132,7 +132,7 @@ class ChiouYoungs2013(GMPE):
             # first line of eq. 12
             ln_y_ref + eta
             # second + 3rd line
-            + self._get_site_term(C, sites.vs30, ln_y_ref)
+            + self._get_site_term(rup, C, sites.vs30)
             # fourth line
             + deep_s
             # fifth line
@@ -141,17 +141,17 @@ class ChiouYoungs2013(GMPE):
 
         return ln_y
 
-    def _get_site_term(self, C, vs30, ln_y_ref):
+    def _get_site_term(self, rup, C, vs30):
         """
         This implements the site term of the CY14 GMM. See
         :class:`openquake.hazardlib.gsim.chiou_youngs_2014.ChiouYoungs2014`
         for additional information.
         """
-        reg = self._get_regional_terms(self, C)
+        reg = self._get_regional_terms(rup, C)
         f_site = reg['phi1'] / (1. + ((vs30/reg['phi1a']) ** reg['phi1b']))
         return f_site
 
-    def _get_regional_terms(self, C):
+    def _get_regional_terms(self, rup, C):
         """
         Retrieve regional terms
 
@@ -180,7 +180,7 @@ class ChiouYoungs2013(GMPE):
         Implements equations 13 for inter-event, intra-event
         and total standard deviations.
         """
-        reg = self._get_regional_terms(C)
+        reg = self._get_regional_terms(rup, C)
 
         Fmeasured = sites.vs30measured
         Finferred = 1 - sites.vs30measured
@@ -224,10 +224,10 @@ class ChiouYoungs2013(GMPE):
         mag_test1 = np.cosh(2. * max(rup.mag - 4.5, 0))
 
         # get centered_ztor value
-        centered_ztor = self._get_centered_ztor(rup, Frv)
+        centered_ztor = self._get_centered_ztor(rup)
 
         # get regional terms
-        reg = self._get_regional_terms(C)
+        reg = self._get_regional_terms(rup, C)
         gamma = reg['gamma']
 
         ln_y_ref = (
@@ -270,14 +270,14 @@ class ChiouYoungs2013(GMPE):
         California and non-Japan regions
         """
         #: California and non-Japan regions
-        return CY14._get_centered_z1pt0(self, sites)
+        return CY14._get_centered_z1pt0(self.__class__.__name__, sites)
 
-    def _get_centered_ztor(self, rup, Frv):
+    def _get_centered_ztor(self, rup):
         """
         Get ztor centered on the M- dependent avarage ztor(km)
         by different fault types.
         """
-        return CY14._get_centered_ztor(self, rup, Frv)
+        return CY14._get_centered_ztor(rup)
 
     #: Coefficients obtained from Table 5.3 (Period-dependent coefficients of
     #: model for ln(yref)), Table 5.4 (Coefficients of site response model for
@@ -317,7 +317,7 @@ class ChiouYoungs2013RegJPN(ChiouYoungs2013):
     """
     This implements the Chiou & Youngs (2013) GMPE
     """
-    def _get_regional_terms(self, C):
+    def _get_regional_terms(self, rup, C):
         """
         Retrieve regional terms
         """
@@ -345,9 +345,9 @@ class ChiouYoungs2013RegJPN(ChiouYoungs2013):
 
 class ChiouYoungs2013RegTWN(ChiouYoungs2013):
     """
-    This implements the Chiou & Youngs (2014) GMPE
+    This implements the Chiou & Youngs (2013) GMPE
     """
-    def _get_regional_terms(self, C):
+    def _get_regional_terms(self, rup, C):
         """
         Retrieve regional terms
         """
@@ -369,7 +369,7 @@ class ChiouYoungs2013RegCHN(ChiouYoungs2013):
     """
     This implements the Chiou & Youngs (2013) GMPE
     """
-    def _get_regional_terms(self, C):
+    def _get_regional_terms(self, rup, C):
         """
         Retrieve regional terms
         """
@@ -388,7 +388,7 @@ class ChiouYoungs2013RegITA(ChiouYoungs2013):
     """
     This implements the Chiou & Youngs (2013) GMPE
     """
-    def _get_regional_terms(self, C):
+    def _get_regional_terms(self, rup, C):
         """
         Retrieve regional terms
         """
