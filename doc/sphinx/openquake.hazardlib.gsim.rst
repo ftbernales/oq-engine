@@ -440,6 +440,14 @@ chiou_youngs_2008_swiss_coeffs
     :undoc-members:
     :show-inheritance:
 
+chiou_youngs_2013
+-------------------------------------------------
+
+.. automodule:: openquake.hazardlib.gsim.chiou_youngs_2013
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 chiou_youngs_2014
 -------------------------------------------------
 
