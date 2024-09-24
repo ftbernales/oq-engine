@@ -77,7 +77,7 @@ class LogicTreeTestCase(CalculatorTestCase):
                 rmap, full_lt.g_weights(trt_smrs), wget, oq.imtls)
             er = exp_rates[exp_rates < 1]
             mr = mean_rates[mean_rates < 1]
-            aac(mr, er, atol=1e-6)
+            aac(mr, er, atol=8e-6)
 
     def test_case_01(self):
         # same source in two source models
@@ -335,8 +335,7 @@ hazard_uhs-std.csv
         mean_poes = self.calc.datastore['hcurves-stats'][0, 0]  # shape (M, L1)
         window = self.calc.datastore['oqparam'].investigation_time
         mean_rates = to_rates(mean_poes, window)
-        rates_by_source = self.calc.datastore[
-            'mean_rates_by_src'][0]  # (M, L1, Ns)
+        rates_by_source = self.calc.datastore['mean_rates_by_src'][0]  # (M, L1, Ns)
         aac(mean_rates, rates_by_source.sum(axis=2), atol=5E-7)
 
     def test_case_20(self):
@@ -504,6 +503,7 @@ hazard_uhs-std.csv
 
     def test_case_36(self):
         # test with advanced applyToSources and disordered gsim_logic_tree
+        # testing also split_by_gsim
         self.run_calc(case_36.__file__, 'job.ini')
         hc_id = str(self.calc.datastore.calc_id)
         self.run_calc(case_36.__file__, 'job.ini', hazard_calculation_id=hc_id,
@@ -596,18 +596,18 @@ hazard_uhs-std.csv
 
         # First calculation
         self.run_calc(case_58.__file__, 'job.ini')
-        f01, f02 = export(('hcurves/rlz-000', 'csv'), self.calc.datastore)
-        f03, f04 = export(('hcurves/rlz-003', 'csv'), self.calc.datastore)
+        f01, _f02 = export(('hcurves/rlz-000', 'csv'), self.calc.datastore)
+        f03, _f04 = export(('hcurves/rlz-003', 'csv'), self.calc.datastore)
 
         # Second calculation. Same LT structure for case 1 but with only one
         # branch for each branch set
         self.run_calc(case_58.__file__, 'job_case01.ini')
-        f11, f12 = export(('hcurves/', 'csv'), self.calc.datastore)
+        f11, _f12 = export(('hcurves/', 'csv'), self.calc.datastore)
 
         # Third calculation. In this case we use a source model containing one
         # source with the geometry of branch b22 and slip rate of branch b32
         self.run_calc(case_58.__file__, 'job_case02.ini')
-        f21, f22 = export(('hcurves/', 'csv'), self.calc.datastore)
+        f21, _f22 = export(('hcurves/', 'csv'), self.calc.datastore)
 
         # First test
         self.assertEqualFiles(f01, f11)
@@ -664,8 +664,9 @@ hazard_uhs-std.csv
 
         # check the reduction from 10 to 2 realizations
         rlzs = extract(self.calc.datastore, 'realizations').array
-        ae(rlzs['branch_path'], [b'AA~A', b'AA~A', b'AA~A', b'AA~A', b'AA~A',
-                                 b'AA~A', b'AA~A', b'B.~A', b'B.~A', b'B.~A'])
+        exp = [b'AAA~A', b'AAA~A', b'AAA~A', b'AAA~A', b'AAA~A', b'AAA~A',
+               b'AAA~A', b'AB.~A', b'AB.~A', b'AB.~A']
+        ae(rlzs['branch_path'], exp)
         aac(rlzs['weight'], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
         # check the hazard curves

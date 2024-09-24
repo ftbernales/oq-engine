@@ -19,6 +19,7 @@
 import io
 import ast
 import html
+import json
 import os.path
 import numbers
 import operator
@@ -44,8 +45,8 @@ from openquake.risklib import riskmodels
 from openquake.risklib.scientific import (
     losses_by_period, return_periods, LOSSID, LOSSTYPE)
 from openquake.baselib.writers import build_header, scientificformat
-from openquake.calculators.classical import get_pmaps_gb
-from openquake.calculators.getters import get_ebrupture, MapGetter
+from openquake.calculators.getters import (
+    get_ebrupture, MapGetter, get_pmaps_gb)
 from openquake.calculators.extract import extract
 
 TWO24 = 2**24
@@ -233,6 +234,17 @@ def text_table(data, header=None, fmt=None, ext='rst'):
             lines.append(sepline)
     return '\n'.join(lines)
 
+@view.add('high_hazard')
+def view_high_hazard(token, dstore):
+    """
+    Returns the sites with hazard curve below max(poes)
+    """
+    oq = dstore['oqparam']
+    max_poe= max(oq.poes)
+    max_hazard = dstore.sel('hcurves-stats', stat='mean', lvl=0)[:, 0, :, 0]  # NSML1 -> NM
+    high = (max_hazard > max_poe).all(axis=1)
+    return max_hazard[high]
+
 
 @view.add('worst_sources')
 def view_worst_sources(token, dstore):
@@ -295,6 +307,12 @@ def view_contents(token, dstore):
     tot = (dstore.filename, humansize(os.path.getsize(dstore.filename)))
     data = sorted((dstore.getsize(key), key) for key in dstore)
     rows = [(key, humansize(nbytes)) for nbytes, key in data] + [tot]
+    scratch_dir = dstore['/'].attrs.get('scratch_dir')
+    if scratch_dir:
+        size = 0
+        for fname in os.listdir(scratch_dir):
+            size += os.path.getsize(os.path.join(scratch_dir, fname))
+        rows.append((scratch_dir, humansize(size)))
     return numpy.array(rows, dt('dataset size'))
 
 
@@ -405,9 +423,8 @@ def view_job_info(token, dstore):
         sent = sorted(dic.items(), key=operator.itemgetter(1), reverse=True)
         sent = ['%s=%s' % (k, humansize(v)) for k, v in sent[:3]]
         recv = get_array(task_info, taskname=encode(task))['received']
-        data.append((task, ' '.join(sent),
-                     humansize(recv.sum()), humansize(recv.mean())))
-    return numpy.array(data, dt('task sent received mean_recv'))
+        data.append((task, ' '.join(sent), humansize(recv.sum())))
+    return numpy.array(data, dt('task sent received'))
 
 
 @view.add('avglosses_data_transfer')
@@ -707,6 +724,12 @@ def view_required_params_per_trt(token, dstore):
     return text_table(tbl, header='trt gsims req_params'.split(),
                       fmt=scientificformat)
 
+def discard_small(values):
+    """
+    Discard values 10x smaller than the mean
+    """
+    return values[values >= .1 * values.mean()]
+
 
 @view.add('task_info')
 def view_task_info(token, dstore):
@@ -730,7 +753,7 @@ def view_task_info(token, dstore):
 
     data = []
     for task, arr in group_array(task_info[()], 'taskname').items():
-        val = arr['duration']
+        val = discard_small(arr['duration'])
         if len(val):
             data.append(stats(task, val, val.max() / val.mean()))
     if not data:
@@ -780,13 +803,16 @@ def view_task_hazard(token, dstore):
     data.sort(order='duration')
     rec = data[int(index)]
     taskno = rec['task_no']
-    sdata = dstore.read_df('source_data', 'taskno').loc[taskno]
-    num_ruptures = sdata.nrupts.sum()
-    eff_sites = sdata.nsites.sum()
-    msg = ('taskno={:_d}, fragments={:_d}, num_ruptures={:_d}, '
-           'eff_sites={:_d}, weight={:.1f}, duration={:.1f}s').format(
-                 taskno, len(sdata), num_ruptures, eff_sites,
-                 rec['weight'], rec['duration'])
+    if len(dstore['source_data/src_id']):
+        sdata = dstore.read_df('source_data', 'taskno').loc[taskno]
+        num_ruptures = sdata.nrupts.sum()
+        eff_sites = sdata.nsites.sum()
+        msg = ('taskno={:_d}, fragments={:_d}, num_ruptures={:_d}, '
+               'eff_sites={:_d}, weight={:.1f}, duration={:.1f}s').format(
+                     taskno, len(sdata), num_ruptures, eff_sites,
+                     rec['weight'], rec['duration'])
+    else:
+        msg = ''
     return msg
 
 
@@ -983,7 +1009,7 @@ def view_mean_disagg(token, dstore):
     Display mean quantities for the disaggregation. Useful for checking
     differences between two calculations.
     """
-    N, M, P = dstore['hmap3'].shape
+    N, _M, P = dstore['hmap3'].shape
     tbl = []
     kd = {key: dset[:] for key, dset in sorted(dstore['disagg-rlzs'].items())}
     oq = dstore['oqparam']
@@ -1207,7 +1233,7 @@ def view_calc_risk(token, dstore):
             continue
         out = crmodel.get_output(adf, df, oq._sec_losses, rng)
         outs.append(out)
-    avg, alt = ebr.aggreg(outs, crmodel, ARK, aggids, rlz_id, oq.ideduc, mon)
+    _avg, alt = ebr.aggreg(outs, crmodel, ARK, aggids, rlz_id, oq.ideduc, mon)
     del alt['event_id']
     del alt['variance']
     alt['type'] = LOSSTYPE[alt.loss_id]
@@ -1480,7 +1506,7 @@ def view_sum(token, dstore):
     """
     _, arrayname = token.split(':')  # called as sum:damages-rlzs
     dset = dstore[arrayname]
-    A, R, L, *D = dset.shape
+    _A, R, L, *D = dset.shape
     cols = ['RL'] + tup2str(itertools.product(*[range(d) for d in D]))
     arr = dset[:].sum(axis=0)  # shape R, L, *D
     z = numpy.zeros(R * L, dt(cols))
@@ -1628,6 +1654,39 @@ def view_relevant_sources(token, dstore):
     return aw.array[rates > .1 * rates[0]]
 
 
+def asce_fix(asce, siteid):
+    dic = json.loads(asce.decode('ascii'))
+    for k, v in dic.items():
+        if v == 'n.a.':
+            dic[k] = numpy.nan
+    dic['siteid'] = siteid
+    return dic
+
+
+@view.add('asce')
+def view_asce(token, dstore):
+    """
+    Returns asce:41 and asce:07 arrays
+    """
+    key = token.replace(':', '')
+    sitecol = dstore['sitecol']
+    model = dstore['oqparam'].description[9:12]
+    dics = [asce_fix(a, model + str(sid))
+            for sid, a in zip(sitecol.sids, dstore[key])]
+    header = dics[0]
+    dtlist = []
+    for k in header:
+        if isinstance(header[k], str):
+            dtlist.append((k, object))
+        else:
+            dtlist.append((k, float))
+    res = numpy.zeros(len(dics), dtlist)
+    for i, dic in enumerate(dics):
+        for k in header:
+            res[i][k] = dic[k]
+    return res
+
+
 def shorten(lst):
     """
     Shorten a list of strings
@@ -1709,7 +1768,7 @@ def compare_disagg_rates(token, dstore):
 def view_gh3(token, dstore):
     sitecol = dstore['sitecol']
     gh3 = geo.utils.geohash3(sitecol.lons, sitecol.lats)
-    uni, cnt = numpy.unique(gh3, return_counts=True)
+    _uni, cnt = numpy.unique(gh3, return_counts=True)
     # print(sorted(cnt))
     return numpy.array([stats('gh3', cnt)],
                        dt('kind counts mean stddev min max'))
@@ -1741,7 +1800,7 @@ def view_aggrisk(token, dstore):
     AVG = len(rlzs)
     arr = numpy.zeros(AVG + 1, dt)
     for r, rlz in enumerate(rlzs):
-        arr[r]['gsim'] = repr(repr(rlz.value[0]))
+        arr[r]['gsim'] = repr(rlz.value[0])
         arr[r]['weight'] = rlz.weight[-1]
     for r, loss_id, loss in zip(df.rlz_id, df.loss_id, df.loss):
         rlz = rlzs[r]
@@ -1781,4 +1840,32 @@ def view_fastmean(token, dstore):
 
 @view.add('gw')
 def view_gw(token, dstore):
+    """
+    Display the gweights
+    """
     return numpy.round(dstore['gweights'][:].sum(), 3)
+
+
+@view.add('long_ruptures')
+def view_long_ruptures(token, dstore):
+    """
+    Display the planar ruptures with maxlen > 900 km
+    """
+    lst = []
+    for src in dstore['_csm'].get_sources():
+        maxlen = source.point.get_rup_maxlen(src)
+        if src.code in b'MPA' and maxlen > 900.:
+            usd = src.upper_seismogenic_depth
+            lsd = src.lower_seismogenic_depth
+            maxmag, _rate = src.get_annual_occurrence_rates()[-1]
+            lst.append((src.source_id, maxlen, maxmag, usd, lsd))
+    arr = numpy.array(lst, [('source_id', object), ('maxlen', float),
+                            ('maxmag', float), ('usd', float), ('lsd', float)])
+    arr.sort(order='maxlen')
+    return arr
+
+@view.add('msr')
+def view_msr(token, dstore):
+    dic = dstore['_csm'].get_msr_by_grp()
+    pairs = list(dic.items())
+    return numpy.array(pairs, dt('grp_id msr'))

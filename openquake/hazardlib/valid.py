@@ -190,11 +190,12 @@ def gsim(value, basedir=''):
 
 def modified_gsim(gmpe, **kwargs):
     """
-    Builds a ModifiableGMPE from a gmpe
+    Builds a ModifiableGMPE from a gmpe. Used for instance in the GEESE project
+    as follows:
+
+    mgs = modified_gsim(gsim, add_between_within_stds={'with_betw_ratio':1.5})
     """
-    text = '[ModifiableGMPE]\n'
-    [(gmpe_name, kw)] = toml.loads(gmpe._toml).items()
-    text += f'gmpe.{gmpe_name} = {_fix_toml(kw)}\n'
+    text = gmpe._toml.replace('[', '[ModifiableGMPE.gmpe.') + '\n'
     text += toml.dumps({'ModifiableGMPE': kwargs})
     return gsim(text)
 
@@ -325,6 +326,11 @@ class Regex(object):
 name = Regex(r'^[a-zA-Z_]\w*$')
 
 name_with_dashes = Regex(r'^[a-zA-Z_][\w\-]*$')
+
+# e.g. 2023-02-06 04:17:34+03:00
+# +03:00 indicates the time zone offset from Coordinated Universal Time (UTC)
+local_timestamp = Regex(
+    r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}([+-]\d{2}:\d{2})$")
 
 
 class SimpleId(object):
@@ -1139,6 +1145,23 @@ def positiveints(value):
     return ints
 
 
+def tile_spec(value):
+    """
+    Specify a tile with a string of format "no:nt"
+    where `no` is an integer in the range `1..nt` and `nt`
+    is the total number of tiles.
+
+    >>> tile_spec('[1,2]')
+    [1, 2]
+    >>> tile_spec('[2,2]')
+    [2, 2]
+    """
+    no, ntiles = ast.literal_eval(value)
+    assert ntiles > 0, ntiles
+    assert no > 0 and no <= ntiles, no
+    return [no, ntiles]
+
+
 def simple_slice(value):
     """
     >>> simple_slice('2:5')
@@ -1433,6 +1456,11 @@ def corename(src):
     :returns: the core name of a source
     """
     src = src if isinstance(src, str) else src.source_id
+    # @ section of multifault source
+    # ! source model logic tree branch
+    # : component of mutex source
+    # ; alternate logictree version of a source
+    # . component of split source
     return re.split('[!:;.]', src)[0]
 
 

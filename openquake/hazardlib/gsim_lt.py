@@ -122,14 +122,14 @@ class ImtWeight(object):
         return '<%s %s>' % (self.__class__.__name__, self.dic)
 
 
-def keyno(branch_id, bsno, brno):
+def keyno(branch_id, bsno, brno, base=BASE183):
     """
     :param branch_id: a branch ID string
     :param bsno: number of the branchset (starting from 0)
     :param brno: number of the branch in the branchset (starting from 0)
     :returns: a short unique alias for the branch_id
     """
-    return BASE183[brno] + str(bsno)
+    return base[brno] + str(bsno)
 
 
 # currently not used
@@ -530,15 +530,13 @@ class GsimLogicTree(object):
         branches.sort(key=lambda b: b.trt)
         return branches
 
-    def get_weights(self, trt, imt='weight'):
+    def get_weight(self, trt, gsim, imt='weight'):
         """
-        Branch weights for the given TRT
+        Branch weights for the given TRT and gsim
         """
-        weights = []
         for br in self.branches:
-            if br.trt == trt:
-                weights.append(br.weight[imt])
-        return numpy.array(weights)
+            if br.trt == trt and br.gsim._toml == gsim._toml:
+                return br.weight[imt]
 
     def sample(self, n, seed, sampling_method='early_weights'):
         """

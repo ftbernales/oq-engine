@@ -193,11 +193,11 @@ def export_aelo_csv(key, dstore):
         array = numpy.zeros(M*L1, [('imt', hdf5.vstr), ('iml', float),
                                    ('poe', float)])
         for m, imt in enumerate(oq.imtls):
-            for l, iml in enumerate(oq.imtls[imt]):
-                row = array[m*L1 + l]
+            for li, iml in enumerate(oq.imtls[imt]):
+                row = array[m*L1 + li]
                 row['imt'] = imt
                 row['iml'] = iml
-                row['poe'] = arr[m, l]
+                row['poe'] = arr[m, li]
         writers.write_csv(fname, array, comment=comment)
 
     elif key == 'uhs':
@@ -313,6 +313,24 @@ def export_cond_spectra(ekey, dstore):
         comment['site_id'] = n
         comment['lon'] = sitecol.lons[n]
         comment['lat'] = sitecol.lats[n]
+        writer.save(df, fname, comment=comment)
+        fnames.append(fname)
+    return fnames
+
+
+@export.add(('median_spectra', 'csv'))
+def export_median_spectra(ekey, dstore):
+    sitecol = dstore['sitecol']
+    writer = writers.CsvWriter(fmt=writers.FIVEDIGITS)
+    fnames = []
+    for n in sitecol.sids:
+        aw = extract(dstore, f'median_spectra?site_id={n}')
+        df = aw.to_dframe().sort_values(['poe', 'period'])
+        comment = dstore.metadata.copy()
+        comment['site_id'] = n
+        comment['lon'] = sitecol.lons[n]
+        comment['lat'] = sitecol.lats[n]
+        fname = dstore.export_path('median_spectrum-%d.csv' % n)
         writer.save(df, fname, comment=comment)
         fnames.append(fname)
     return fnames
@@ -537,7 +555,7 @@ def export_mean_disagg_by_src(ekey, dstore):
             ('disagg-stats', 'csv'),
             ('disagg-rlzs-traditional', 'csv'))
 def export_disagg_csv(ekey, dstore):
-    name, ext = ekey
+    name, _ext = ekey
     spec = name[7:]  # rlzs, stats, rlzs-traditional, stats-traditional
     oq = dstore['oqparam']
     sitecol = dstore['sitecol']
@@ -668,7 +686,6 @@ def export_mce(ekey, dstore):
 def export_asce(ekey, dstore):
     sitecol = dstore['sitecol']    
     for s, site in enumerate(sitecol):
-        sid = site.id
         js = dstore[ekey[0]][s].decode('utf8')
         dic = json.loads(js)
         writer = writers.CsvWriter(fmt='%.5f')

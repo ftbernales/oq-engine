@@ -41,7 +41,7 @@ import subprocess
 import collections
 import multiprocessing
 from contextlib import contextmanager
-from collections.abc import Mapping, Container, MutableSequence
+from collections.abc import Mapping, Container, Sequence, MutableSequence
 import numpy
 import pandas
 from decorator import decorator
@@ -57,7 +57,9 @@ BASE183 = ("ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmno"
            "pqrstuvwxyz{|}!#$%&'()*+-/0123456789:;<=>?@¡¢"
            "£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑ"
            "ÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ")
-
+BASE33489 = []  # built in 0.003 seconds
+for a, b in itertools.product(BASE183, BASE183):
+    BASE33489.append(a + b)
 mp = multiprocessing.get_context('spawn')
 
 
@@ -234,19 +236,11 @@ def distinct(keys):
     return outlist
 
 
-def ceil(a, b):
+def ceil(x):
     """
-    Divide a / b and return the biggest integer close to the quotient.
-
-    :param a:
-        a number
-    :param b:
-        a positive number
-    :returns:
-        the biggest integer close to the quotient
+    Converts the result of math.ceil into an integer
     """
-    assert b > 0, b
-    return int(math.ceil(float(a) / b))
+    return int(math.ceil(x))
 
 
 def block_splitter(items, max_weight, weight=lambda item: 1, key=nokey,
@@ -498,11 +492,12 @@ def extract_dependencies(lines):
     for line in lines:
         longname = line.split('/')[-1]  # i.e. urllib3-2.1.0-py3-none-any.whl
         try:
-            pkg, version, *other = longname.split('-')
+            pkg, version, _other = longname.split('-', 2)
         except ValueError:  # for instance a comment
             continue
         if pkg in ('fonttools', 'protobuf', 'pyreadline3', 'python_dateutil',
-                   'python_pam', 'django_cors_headers', 'django_cookie_consent'):
+                   'python_pam', 'django_cors_headers',
+                   'django_cookie_consent'):
             # not importable
             continue
         if pkg in ('alpha_shapes', 'django_pam', 'pbr', 'iniconfig',
@@ -600,7 +595,7 @@ def import_all(module_or_package):
             # the current working directory is not a subpackage
             continue
         for f in files:
-            if f.endswith('.py'):
+            if f.endswith('.py') and not f.startswith('__init__'):
                 # convert PKGPATH/subpackage/module.py -> subpackage.module
                 # works at any level of nesting
                 modname = (module_or_package + cwd[n:].replace(os.sep, '.') +
@@ -1147,6 +1142,17 @@ def fast_agg3(structured_array, kfield, vfields=None, factor=None):
     for name in dic:
         res[name] = dic[name]
     return res
+
+
+def idxs_by_tag(tags):
+    """
+    >>> idxs_by_tag([2, 1, 1, 2])
+    {2: array([0, 3], dtype=uint32), 1: array([1, 2], dtype=uint32)}
+    """
+    dic = AccumDict(accum=[])
+    for i, tag in enumerate(tags):
+        dic[tag].append(i)
+    return {tag: numpy.uint32(dic[tag]) for tag in dic}
 
 
 def count(groupiter):
@@ -1769,6 +1775,7 @@ def decompress(cbytes):
 # with monitor.shared['arr'] as arr:
 #      big_object = loada(arr)
 
+
 def dumpa(obj):
     """
     Dump a Python object as an array of uint8:
@@ -1789,3 +1796,25 @@ def loada(arr):
     """
     return pickle.loads(bytes(arr))
 
+
+class Deduplicate(Sequence):
+    """
+    Deduplicate lists containing duplicated objects
+    """
+    def __init__(self, objects, check_one=False):
+        pickles = [pickle.dumps(obj, pickle.HIGHEST_PROTOCOL)
+                   for obj in objects]
+        uni, self.inv = numpy.unique(pickles, return_inverse=True)
+        self.uni = [pickle.loads(pik) for pik in uni]
+        if check_one:
+            assert len(self.uni) == 1, self.uni
+
+    def __getitem__(self, i):
+        return self.uni[self.inv[i]]
+
+    def __repr__(self):
+        name = self[0].__class__.__name__
+        return '<Deduplicated %s %d/%d>' % (name, len(self.uni), len(self.inv))
+
+    def __len__(self):
+        return len(self.inv)

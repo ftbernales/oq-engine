@@ -39,7 +39,6 @@ MPLBACKEND=Agg oq plot 'disagg?kind=Mag&imt=PGA&poe_id=1&spec=rlzs' 14
 MPLBACKEND=Agg oq plot 'task_info?kind=classical' 9
 MPLBACKEND=Agg oq plot_assets -1
 MPLBACKEND=Agg oq plot memory? -1
-MPLBACKEND=Agg oq plot sources? 9
 
 # run multi_risk test
 oq engine --run $1/../openquake/qa_tests_data/multi_risk/case_1/job_2.ini
@@ -58,6 +57,9 @@ oq show agg_values
 # recompute losses
 oq reaggregate -1 NAME_1
 oq engine --list-outputs -1
+
+# sensitivity to the strike angle
+oq shell $1/risk/ScenarioRisk/sensitivity.py
 
 #echo "Testing csm2rup"
 #commented because missing export_outputs and breaking QGIS

@@ -229,13 +229,15 @@ def extract_realizations(dstore, dummy):
     """
     Extract an array of realizations. Use it as /extract/realizations
     """
-    dt = [('rlz_id', U32), ('branch_path', '<S100'), ('weight', F32)]
     oq = dstore['oqparam']
     scenario = 'scenario' in oq.calculation_mode
     full_lt = dstore['full_lt']
     rlzs = full_lt.rlzs
+    bpaths = encode(rlzs['branch_path'])
     # NB: branch_path cannot be of type hdf5.vstr otherwise the conversion
     # to .npz (needed by the plugin) would fail
+    bplen = max(len(bp) for bp in bpaths)
+    dt = [('rlz_id', U32), ('branch_path', '<S%d' % bplen), ('weight', F32)]
     arr = numpy.zeros(len(rlzs), dt)
     arr['rlz_id'] = rlzs['ordinal']
     arr['weight'] = rlzs['weight']
@@ -247,7 +249,7 @@ def extract_realizations(dstore, dummy):
         arr['branch_path'] = ['"%s"' % repr(gsim)[2:-1].replace('"', '""')
                               for gsim in gsims]  # quotes Excel-friendly
     else:  # use the compact representation for the branch paths
-        arr['branch_path'] = encode(rlzs['branch_path'])
+        arr['branch_path'] = bpaths
     return arr
 
 
@@ -494,6 +496,22 @@ def extract_uhs(dstore, what):
             yield k, v
 
 
+@extract.add('median_spectra')
+def extract_median_spectra(dstore, what):
+    """
+    Extracts median spectra. Use it as /extract/median_spectra?site_id=0
+    """
+    qdict = parse(what)
+    [site_id] = qdict['site_id']
+    dset = dstore['log_median_spectra']
+    dic = json.loads(dset.attrs['json'])
+    spectra = numpy.exp(dset[:, site_id].sum(axis=0))  # (M, P)
+    return ArrayWrapper(spectra, dict(
+        shape_descr=['period', 'poe'],
+        period=dic['period'],
+        poe=dic['poe']))
+
+
 @extract.add('effect')
 def extract_effect(dstore, what):
     """
@@ -590,7 +608,6 @@ def extract_sources(dstore, what):
         codes = [code.encode('utf8') for code in codes]
     fields = 'source_id code num_sites num_ruptures'
     info = dstore['source_info'][()][fields.split()]
-    wkt = decode(dstore['source_wkt'][()])
     arrays = []
     if source_ids is not None:
         logging.info('Extracting sources with ids: %s', source_ids)
@@ -612,14 +629,13 @@ def extract_sources(dstore, what):
     if not arrays:
         raise ValueError('There  no sources')
     info = numpy.concatenate(arrays)
-    wkt_gz = gzip.compress(';'.join(wkt).encode('utf8'))
     src_gz = gzip.compress(';'.join(decode(info['source_id'])).encode('utf8'))
     oknames = [name for name in info.dtype.names  # avoid pickle issues
                if name != 'source_id']
     arr = numpy.zeros(len(info), [(n, info.dtype[n]) for n in oknames])
     for n in oknames:
         arr[n] = info[n]
-    return ArrayWrapper(arr, {'wkt_gz': wkt_gz, 'src_gz': src_gz})
+    return ArrayWrapper(arr, {'src_gz': src_gz})
 
 
 @extract.add('gridded_sources')
@@ -846,7 +862,7 @@ def extract_aggregate(dstore, what):
     /extract/aggregate/avg_losses?
     kind=mean&loss_type=structural&tag=taxonomy&tag=occupancy
     """
-    name, qstring = what.split('?', 1)
+    _name, qstring = what.split('?', 1)
     info = get_info(dstore)
     qdic = parse(qstring, info)
     suffix = '-rlzs' if qdic['rlzs'] else '-stats'
@@ -897,11 +913,11 @@ def extract_losses_by_asset(dstore, what):
         yield 'rlz-000', data
 
 
-def _gmf(df, num_sites, imts):
+def _gmf(df, num_sites, imts, sec_imts):
     # convert data into the composite array expected by QGIS
-    gmfa = numpy.zeros(num_sites, [(imt, F32) for imt in imts])
-    for m, imt in enumerate(imts):
-        gmfa[imt][U32(df.sid)] = df[f'gmv_{m}']
+    gmfa = numpy.zeros(num_sites, [(imt, F32) for imt in imts + sec_imts])
+    for m, imt in enumerate(imts + sec_imts):
+        gmfa[imt][U32(df.sid)] = df[f'gmv_{m}'] if imt in imts else df[imt]
     return gmfa
 
 
@@ -952,7 +968,9 @@ def extract_gmf_npz(dstore, what):
         # zero GMF
         yield 'rlz-%03d' % rlzi, []
     else:
-        gmfa = _gmf(df, n, oq.imtls)
+        imts = list(oq.imtls)
+        sec_imts = oq.sec_imts
+        gmfa = _gmf(df, n, imts, sec_imts)
         yield 'rlz-%03d' % rlzi, util.compose_arrays(sites, gmfa)
 
 
@@ -1046,7 +1064,7 @@ def build_damage_array(data, damage_dt):
     :param damage_dt: a damage composite data type loss_type -> states
     :returns: a composite array of length N and dtype damage_dt
     """
-    A, L, D = data.shape
+    A, _L, _D = data.shape
     dmg = numpy.zeros(A, damage_dt)
     for a in range(A):
         for li, lt in enumerate(damage_dt.names):
@@ -1255,7 +1273,7 @@ def extract_mean_rates_by_src(dstore, what):
     site_id = int(site_id)
     imt_id = list(oq.imtls).index(imt)
     rates = dset[site_id, imt_id]
-    L1, Ns = rates.shape
+    _L1, Ns = rates.shape
     arr = numpy.zeros(len(src_id), [('src_id', hdf5.vstr), ('rate', '<f8')])
     arr['src_id'] = src_id
     arr['rate'] = [numpy.interp(iml, oq.imtls[imt], rates[:, i])
@@ -1521,8 +1539,19 @@ def extract_med_gmv(dstore, what):
     """
     return extract_(dstore, 'med_gmv/' + what)
 
-# #####################  extraction from the WebAPI ###################### #
 
+@extract.add('high_sites')
+def extract_high_sites(dstore, what):
+    """
+    Returns an array of boolean with the high hazard sites (max_poe > .2)
+    Example:
+    http://127.0.0.1:8800/v1/calc/30/extract/high_sites
+    """
+    max_hazard = dstore.sel('hcurves-stats', stat='mean', lvl=0)[:, 0, :, 0]  # NSML1 -> NM
+    return (max_hazard > .2).all(axis=1)  # shape N
+
+
+# #####################  extraction from the WebAPI ###################### #
 
 class WebAPIError(RuntimeError):
     """
